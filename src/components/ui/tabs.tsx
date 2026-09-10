@@ -43,7 +43,7 @@ export function Tabs({ items, activeId, onChange, className }: TabsProps) {
             {isActive && (
               <motion.div
                 layoutId="activeTabIndicator"
-                className="absolute inset-0 bg-white rounded-lg shadow-xs border border-slate-200/60"
+                className="absolute inset-0 bg-white rounded-lg shadow-xs border border-slate-200/60 pointer-events-none"
                 transition={{ type: "spring", bounce: 0.15, duration: 0.3 }}
               />
             )}
