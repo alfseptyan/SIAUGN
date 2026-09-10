@@ -14,6 +14,8 @@ import { StatCard } from "@/components/ui/stat-card"
 import { PageHeader } from "@/components/ui/page-header"
 import { MOCK_STATS } from "@/lib/mock-data"
 
+import Link from "next/link"
+
 const stats = MOCK_STATS.DIREKTORAT_KEMAHASISWAAN
 
 export default function KemahasiswaanDashboardPage() {
@@ -22,7 +24,24 @@ export default function KemahasiswaanDashboardPage() {
       <PageHeader
         title="Dashboard Kemahasiswaan"
         subtitle="Kelola review beasiswa dan proposal kegiatan mahasiswa."
-      />
+      >
+        <div className="flex items-center gap-2">
+          <Link
+            href="/kemahasiswaan/beasiswa"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary-700 transition-colors cursor-pointer"
+          >
+            <Award className="w-3.5 h-3.5" />
+            Review Beasiswa
+          </Link>
+          <Link
+            href="/kemahasiswaan/approval"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-colors cursor-pointer"
+          >
+            <CheckCircle className="w-3.5 h-3.5" />
+            Approval Penerima
+          </Link>
+        </div>
+      </PageHeader>
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
@@ -77,26 +96,24 @@ export default function KemahasiswaanDashboardPage() {
           <div className="divide-y divide-border/30">
             {[
               {
-                nama: "Beasiswa Unggulan Nusantara",
-                mitra: "PT Telkom Indonesia",
-                tanggal: "8 Sep 2026",
+                nama: "Program Beasiswa Kepemimpinan Muda 2026",
+                mitra: "PT Beasiswa Nusantara",
+                tanggal: "Hari ini",
               },
               {
-                nama: "Beasiswa Prestasi Akademik",
-                mitra: "Yayasan Pendidikan",
-                tanggal: "7 Sep 2026",
+                nama: "Beasiswa Unggulan Prestasi Nusantara",
+                mitra: "PT Beasiswa Nusantara",
+                tanggal: "Kemarin",
               },
               {
-                nama: "Beasiswa Riset Teknologi",
-                mitra: "Google Indonesia",
-                tanggal: "5 Sep 2026",
+                nama: "Dana Hibah Skripsi Sains & Rekayasa",
+                mitra: "Yayasan Sains & Inovasi Bangsa",
+                tanggal: "3 hari lalu",
               },
             ].map((program, index) => (
-              <motion.div
+              <Link
                 key={program.nama}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3, delay: index * 0.05 + 0.3 }}
+                href="/kemahasiswaan/beasiswa"
                 className="flex items-center gap-3 px-6 py-4 hover:bg-muted/30 transition-colors group cursor-pointer"
               >
                 <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
@@ -111,7 +128,7 @@ export default function KemahasiswaanDashboardPage() {
                   </p>
                 </div>
                 <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-              </motion.div>
+              </Link>
             ))}
           </div>
         </motion.div>

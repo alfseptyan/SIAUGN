@@ -16,6 +16,8 @@ import { PageHeader } from "@/components/ui/page-header"
 import { MOCK_STATS } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 
+import Link from "next/link"
+
 const stats = MOCK_STATS.MITRA_BEASISWA
 
 export default function MitraDashboardPage() {
@@ -25,10 +27,13 @@ export default function MitraDashboardPage() {
         title="Dashboard Mitra"
         subtitle="Kelola program beasiswa dan seleksi kandidat."
       >
-        <button className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary-700 transition-colors cursor-pointer">
+        <Link
+          href="/mitra/program"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary-700 transition-colors cursor-pointer"
+        >
           <Plus className="w-4 h-4" />
           Program Baru
-        </button>
+        </Link>
       </PageHeader>
 
       {/* Stat Cards */}
@@ -86,6 +91,7 @@ export default function MitraDashboardPage() {
               pendaftar: 89,
               kuota: 20,
               pending: 30,
+              href: "/mitra/pendaftar",
             },
             {
               nama: "Beasiswa Riset & Inovasi",
@@ -93,6 +99,7 @@ export default function MitraDashboardPage() {
               pendaftar: 67,
               kuota: 15,
               pending: 12,
+              href: "/mitra/pendaftar",
             },
             {
               nama: "Program Magang Berbeasiswa",
@@ -100,14 +107,13 @@ export default function MitraDashboardPage() {
               pendaftar: 0,
               kuota: 10,
               pending: 0,
+              href: "/mitra/program",
             },
           ].map((program, index) => (
-            <motion.div
+            <Link
               key={program.nama}
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3, delay: index * 0.05 + 0.3 }}
-              className="flex items-center gap-4 px-6 py-5 hover:bg-muted/30 transition-colors group cursor-pointer"
+              href={program.href}
+              className="flex items-center gap-4 px-6 py-4 hover:bg-muted/30 transition-colors group cursor-pointer"
             >
               <div
                 className={cn(
@@ -128,7 +134,7 @@ export default function MitraDashboardPage() {
                     className={cn(
                       "px-2 py-0.5 text-xs rounded-full font-medium",
                       program.status === "PUBLISH"
-                        ? "bg-success-light text-success"
+                        ? "bg-emerald-100 text-emerald-700"
                         : "bg-gray-100 text-gray-600"
                     )}
                   >
@@ -153,7 +159,7 @@ export default function MitraDashboardPage() {
                 </div>
               </div>
               <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-            </motion.div>
+            </Link>
           ))}
         </div>
       </motion.div>
