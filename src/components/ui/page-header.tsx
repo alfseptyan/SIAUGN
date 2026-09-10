@@ -5,10 +5,12 @@ import { motion } from "framer-motion"
 interface PageHeaderProps {
   title: string
   subtitle?: string
+  action?: React.ReactNode
   children?: React.ReactNode // for action buttons
 }
 
-export function PageHeader({ title, subtitle, children }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, action, children }: PageHeaderProps) {
+  const actions = action || children
   return (
     <motion.div
       initial={{ opacity: 0, y: -8 }}
@@ -22,7 +24,7 @@ export function PageHeader({ title, subtitle, children }: PageHeaderProps) {
           <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
         )}
       </div>
-      {children && <div className="flex items-center gap-3">{children}</div>}
+      {actions && <div className="flex items-center gap-3">{actions}</div>}
     </motion.div>
   )
 }
