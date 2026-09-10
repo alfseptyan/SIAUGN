@@ -1,0 +1,513 @@
+// SIAKAD - Sistem Informasi Akademik Terintegrasi
+// Prisma Schema v1.0
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum Role {
+  SUPER_ADMIN
+  DOSEN
+  MAHASISWA
+  DIREKTORAT_KEMAHASISWAAN
+  PENGELOLA_FASILITAS
+  MITRA_BEASISWA
+}
+
+enum StatusMahasiswa {
+  AKTIF
+  CUTI
+  DO
+  LULUS
+}
+
+enum StatusKRS {
+  DRAFT
+  DISETUJUI
+  DIBATALKAN
+}
+
+enum StatusPresensi {
+  HADIR
+  IZIN
+  SAKIT
+  ALFA
+}
+
+enum MetodePresensi {
+  QR
+  MANUAL
+}
+
+enum StatusProgramBeasiswa {
+  DRAF
+  MENUNGGU_REVIEW
+  PUBLISH
+  DITOLAK
+  DITUTUP
+}
+
+enum StatusMitra {
+  MENUNGGU
+  DIREKOMENDASIKAN
+  DITOLAK
+}
+
+enum StatusFinal {
+  DIPROSES
+  DITERIMA
+  DITOLAK
+}
+
+enum StatusPeminjaman {
+  MENUNGGU
+  DISETUJUI
+  DITOLAK
+}
+
+enum StatusProposal {
+  MENUNGGU
+  DISETUJUI
+  DITOLAK
+}
+
+enum HariEnum {
+  SENIN
+  SELASA
+  RABU
+  KAMIS
+  JUMAT
+  SABTU
+}
+
+// ============================================
+// MODUL: AUTH & USER
+// ============================================
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  password      String
+  nama          String
+  role          Role
+  avatarUrl     String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  mahasiswa     Mahasiswa?
+  dosen         Dosen?
+  mitra         Mitra?
+  notifikasi    Notifikasi[]
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+// ============================================
+// MODUL 1: AKADEMIK UTAMA
+// ============================================
+
+model Mahasiswa {
+  id        String          @id @default(cuid())
+  userId    String          @unique
+  nim       String          @unique
+  angkatan  Int
+  status    StatusMahasiswa @default(AKTIF)
+  programStudi String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  krs                   KRS[]
+  presensi              Presensi[]
+  pendaftaranBeasiswa   PendaftaranBeasiswa[]
+  peminjamanFasilitas   PeminjamanFasilitas[]
+  proposalKegiatan      ProposalKegiatan[]
+
+  @@map("mahasiswa")
+}
+
+model Dosen {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  nidn      String   @unique
+  homebase  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kelas  Kelas[]
+
+  @@map("dosen")
+}
+
+model MataKuliah {
+  id        String   @id @default(cuid())
+  kode      String   @unique
+  nama      String
+  sks       Int
+  deskripsi String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  kelas Kelas[]
+
+  @@map("mata_kuliah")
+}
+
+model Ruangan {
+  id        String   @id @default(cuid())
+  nama      String   @unique
+  kapasitas Int
+  lokasi    String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  kelas Kelas[]
+
+  @@map("ruangan")
+}
+
+model PeriodeAkademik {
+  id              String   @id @default(cuid())
+  nama            String   // e.g. "Ganjil 2025/2026"
+  semester        String   // "Ganjil" | "Genap"
+  tahunAjaran     String   // e.g. "2025/2026"
+  tanggalMulaiKRS DateTime
+  tanggalTutupKRS DateTime
+  tanggalMulai    DateTime
+  tanggalSelesai  DateTime
+  isActive        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  kelas Kelas[]
+
+  @@map("periode_akademik")
+}
+
+model Kelas {
+  id                    String   @id @default(cuid())
+  mataKuliahId          String
+  dosenId               String
+  ruanganId             String
+  periodeId             String
+  namaKelas             String   // e.g. "A", "B", "C"
+  hari                  HariEnum
+  jamMulai              String   // "08:00"
+  jamSelesai            String   // "10:00"
+  kuota                 Int
+  ambangKehadiranPersen Int      @default(75) // diset dosen per kelas
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  mataKuliah      MataKuliah      @relation(fields: [mataKuliahId], references: [id])
+  dosen           Dosen           @relation(fields: [dosenId], references: [id])
+  ruangan         Ruangan         @relation(fields: [ruanganId], references: [id])
+  periode         PeriodeAkademik @relation(fields: [periodeId], references: [id])
+  krs             KRS[]
+  komponenNilai   KomponenNilai[]
+  skalaNilai      SkalaNilai[]
+  sesiPresensi    SesiPresensi[]
+
+  @@map("kelas")
+}
+
+model KRS {
+  id           String    @id @default(cuid())
+  mahasiswaId  String
+  kelasId      String
+  status       StatusKRS @default(DRAFT)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  mahasiswa      Mahasiswa       @relation(fields: [mahasiswaId], references: [id])
+  kelas          Kelas           @relation(fields: [kelasId], references: [id])
+  nilaiKomponen  NilaiKomponen[]
+  nilai          Nilai?
+
+  @@unique([mahasiswaId, kelasId])
+  @@map("krs")
+}
+
+model KomponenNilai {
+  id          String @id @default(cuid())
+  kelasId     String
+  nama        String // e.g. "Tugas", "UTS", "UAS"
+  bobotPersen Float  // e.g. 30.0
+
+  kelas         Kelas           @relation(fields: [kelasId], references: [id], onDelete: Cascade)
+  nilaiKomponen NilaiKomponen[]
+
+  @@map("komponen_nilai")
+}
+
+model SkalaNilai {
+  id            String @id @default(cuid())
+  kelasId       String
+  huruf         String // "A", "AB", "B", "BC", "C", "D", "E"
+  skorMin       Float
+  skorMax       Float
+
+  kelas Kelas @relation(fields: [kelasId], references: [id], onDelete: Cascade)
+
+  @@map("skala_nilai")
+}
+
+model NilaiKomponen {
+  id          String @id @default(cuid())
+  krsId       String
+  komponenId  String
+  skor        Float?
+
+  krs      KRS           @relation(fields: [krsId], references: [id], onDelete: Cascade)
+  komponen KomponenNilai @relation(fields: [komponenId], references: [id], onDelete: Cascade)
+
+  @@unique([krsId, komponenId])
+  @@map("nilai_komponen")
+}
+
+model Nilai {
+  id                String    @id @default(cuid())
+  krsId             String    @unique
+  nilaiAkhirOtomatis Float?   // hasil kalkulasi sistem
+  nilaiAkhirFinal   Float?    // setelah adjustment dosen
+  huruf             String?
+  lockedAt          DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  krs KRS @relation(fields: [krsId], references: [id], onDelete: Cascade)
+
+  @@map("nilai")
+}
+
+// ============================================
+// MODUL 2: PRESENSI
+// ============================================
+
+model SesiPresensi {
+  id              String   @id @default(cuid())
+  kelasId         String
+  pertemuanKe     Int
+  tanggal         DateTime
+  tokenQr         String   @unique
+  waktuMulai      DateTime
+  waktuKadaluarsa DateTime
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  kelas    Kelas      @relation(fields: [kelasId], references: [id])
+  presensi Presensi[]
+
+  @@map("sesi_presensi")
+}
+
+model Presensi {
+  id            String         @id @default(cuid())
+  sesiId        String
+  mahasiswaId   String
+  waktuScan     DateTime?
+  status        StatusPresensi @default(ALFA)
+  metode        MetodePresensi @default(MANUAL)
+  dibatalkanOleh String?      // userId yang membatalkan
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  sesi      SesiPresensi @relation(fields: [sesiId], references: [id])
+  mahasiswa Mahasiswa    @relation(fields: [mahasiswaId], references: [id])
+  logs      LogPresensi[]
+
+  @@unique([sesiId, mahasiswaId])
+  @@map("presensi")
+}
+
+model LogPresensi {
+  id          String   @id @default(cuid())
+  presensiId  String
+  aksi        String   // "DIBATALKAN", "DIUBAH", dll
+  statusLama  String?
+  statusBaru  String?
+  alasan      String?
+  dilakukanOleh String // userId
+  createdAt   DateTime @default(now())
+
+  presensi Presensi @relation(fields: [presensiId], references: [id], onDelete: Cascade)
+
+  @@map("log_presensi")
+}
+
+// ============================================
+// MODUL 3: MANAJEMEN BEASISWA
+// ============================================
+
+model Mitra {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  namaOrganisasi String
+  kontak      String?
+  alamat      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  programBeasiswa  ProgramBeasiswa[]
+
+  @@map("mitra")
+}
+
+model ProgramBeasiswa {
+  id              String                 @id @default(cuid())
+  mitraId         String
+  nama            String
+  deskripsi       String?
+  kriteria        String?
+  kuota           Int
+  periodeMulai    DateTime?
+  periodeSelesai  DateTime?
+  status          StatusProgramBeasiswa  @default(DRAF)
+  catatanReview   String?               // catatan dari Direktorat
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  mitra       Mitra                 @relation(fields: [mitraId], references: [id])
+  pendaftaran PendaftaranBeasiswa[]
+
+  @@map("program_beasiswa")
+}
+
+model PendaftaranBeasiswa {
+  id            String      @id @default(cuid())
+  mahasiswaId   String
+  programId     String
+  statusMitra   StatusMitra @default(MENUNGGU)
+  statusFinal   StatusFinal @default(DIPROSES)
+  catatanMitra  String?
+  catatanFinal  String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  mahasiswa Mahasiswa         @relation(fields: [mahasiswaId], references: [id])
+  program   ProgramBeasiswa   @relation(fields: [programId], references: [id])
+  dokumen   DokumenPendukung[]
+
+  @@unique([mahasiswaId, programId])
+  @@map("pendaftaran_beasiswa")
+}
+
+model DokumenPendukung {
+  id              String @id @default(cuid())
+  pendaftaranId   String
+  namaFile        String
+  tipeFile        String
+  ukuranBytes     Int
+  path            String
+  createdAt       DateTime @default(now())
+
+  pendaftaran PendaftaranBeasiswa @relation(fields: [pendaftaranId], references: [id], onDelete: Cascade)
+
+  @@map("dokumen_pendukung")
+}
+
+// ============================================
+// MODUL 4: LAYANAN KEMAHASISWAAN
+// ============================================
+
+model Fasilitas {
+  id              String   @id @default(cuid())
+  nama            String
+  deskripsi       String?
+  kapasitas       Int?
+  lokasi          String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  peminjaman PeminjamanFasilitas[]
+
+  @@map("fasilitas")
+}
+
+model PeminjamanFasilitas {
+  id          String           @id @default(cuid())
+  mahasiswaId String
+  fasilitasId String
+  tanggal     DateTime
+  jamMulai    String
+  jamSelesai  String
+  keperluan   String?
+  status      StatusPeminjaman @default(MENUNGGU)
+  catatan     String?          // catatan dari Pengelola Fasilitas
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  mahasiswa Mahasiswa @relation(fields: [mahasiswaId], references: [id])
+  fasilitas Fasilitas @relation(fields: [fasilitasId], references: [id])
+
+  @@map("peminjaman_fasilitas")
+}
+
+model ProposalKegiatan {
+  id          String         @id @default(cuid())
+  mahasiswaId String
+  namaAcara   String
+  deskripsi   String?
+  filePdf     String?        // path ke file PDF
+  status      StatusProposal @default(MENUNGGU)
+  catatan     String?        // catatan dari Direktorat
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  mahasiswa Mahasiswa @relation(fields: [mahasiswaId], references: [id])
+
+  @@map("proposal_kegiatan")
+}
+
+// ============================================
+// MODUL PENDUKUNG
+// ============================================
+
+model Notifikasi {
+  id        String   @id @default(cuid())
+  userId    String
+  judul     String
+  pesan     String
+  tipe      String?  // "KRS", "NILAI", "BEASISWA", "PEMINJAMAN", "PROPOSAL"
+  isRead    Boolean  @default(false)
+  link      String?  // URL tujuan saat diklik
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifikasi")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  aksi      String   // "DELETE_PRESENSI", "ADJUST_NILAI", "LOCK_NILAI", dll
+  entitas   String   // nama model yang terpengaruh
+  entitasId String   // ID record yang terpengaruh
+  detail    String?  // JSON string detail perubahan
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entitas, entitasId])
+  @@map("audit_log")
+}
