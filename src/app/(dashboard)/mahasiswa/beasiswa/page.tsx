@@ -29,29 +29,31 @@ import {
   useBeasiswaStore,
   formatRupiah,
   checkEligibility,
-  type ProgramBeasiswaItem,
-  type PendaftaranBeasiswaItem,
   type DokumenPendukungItem,
 } from "@/lib/beasiswa-store"
+import { ApiBoundary, BannerModeTransisi } from "@/components/ui/api-boundary"
+import type { ProgramBeasiswaDto, StatusBeasiswaDto } from "@/server/modules/beasiswa"
 
 export default function MahasiswaBeasiswaPage() {
-  const { state, applyBeasiswa } = useBeasiswaStore()
+  return (
+    <ApiBoundary<StatusBeasiswaDto> url="/api/v1/mahasiswa/beasiswa">
+      {(data) => <BeasiswaContent data={data} />}
+    </ApiBoundary>
+  )
+}
 
-  // Current logged in student (Budi Santoso)
-  const currentStudent = {
-    id: "mhs-1",
-    nim: "220101001",
-    nama: "Budi Santoso",
-    programStudi: "Teknik Informatika",
-    semester: 5,
-    ipk: 3.82,
-  }
+function BeasiswaContent({ data }: { data: StatusBeasiswaDto }) {
+  // TODO(tulis): pendaftaran masih memakai store lokal; pindahkan ke POST /api/v1/mahasiswa/beasiswa.
+  const { applyBeasiswa } = useBeasiswaStore()
+
+  // Profil, katalog program, dan pendaftaran milik mahasiswa berasal dari database
+  const currentStudent = data.mahasiswa
 
   const [activeTab, setActiveTab] = useState<"KATALOG" | "PENGAJUAN">("KATALOG")
   const [searchQuery, setSearchQuery] = useState("")
 
   // Application Modal state
-  const [selectedProgram, setSelectedProgram] = useState<ProgramBeasiswaItem | null>(null)
+  const [selectedProgram, setSelectedProgram] = useState<ProgramBeasiswaDto | null>(null)
   const [motivationLetter, setMotivationLetter] = useState("")
   const [useSiakadTranscript, setUseSiakadTranscript] = useState(true)
   const [agreementChecked, setAgreementChecked] = useState(false)
@@ -60,7 +62,7 @@ export default function MahasiswaBeasiswaPage() {
 
   // Published programs available for students
   const availablePrograms = useMemo(() => {
-    return state.program.filter((prog) => {
+    return data.program.filter((prog) => {
       if (prog.status !== "PUBLISH") return false
       if (searchQuery) {
         const q = searchQuery.toLowerCase()
@@ -72,14 +74,14 @@ export default function MahasiswaBeasiswaPage() {
       }
       return true
     })
-  }, [state.program, searchQuery])
+  }, [data.program, searchQuery])
 
   // Student's existing applications
   const myApplications = useMemo(() => {
-    return state.pendaftaran.filter((pend) => pend.mahasiswaId === currentStudent.id)
-  }, [state.pendaftaran, currentStudent.id])
+    return data.pendaftaran
+  }, [data.pendaftaran])
 
-  const handleOpenApplyModal = (program: ProgramBeasiswaItem) => {
+  const handleOpenApplyModal = (program: ProgramBeasiswaDto) => {
     setSelectedProgram(program)
     setMotivationLetter("")
     setUseSiakadTranscript(true)
@@ -156,6 +158,7 @@ export default function MahasiswaBeasiswaPage() {
 
   return (
     <div className="space-y-6">
+      <BannerModeTransisi />
       <PageHeader
         title="Layanan & Informasi Beasiswa"
         subtitle="Daftar beasiswa kemitraan universitas dan pantau transparansi 3-Way Approval secara real-time (FR-3.3 s/d FR-3.8)."
@@ -329,7 +332,7 @@ export default function MahasiswaBeasiswaPage() {
       {activeTab === "PENGAJUAN" && (
         <div className="space-y-6">
           {myApplications.map((appl) => {
-            const program = state.program.find((p) => p.id === appl.programId)
+            const program = data.program.find((p) => p.id === appl.programId)
 
             // CRITICAL FR-3.6: Mahasiswa sees "DIPROSES" while statusFinal === "DIPROSES"
             const isAccepted = appl.statusFinal === "DITERIMA"

@@ -17,7 +17,9 @@ import {
   ShieldAlert,
   GraduationCap,
 } from "lucide-react"
-import { useAcademicStore, KelasItem } from "@/lib/academic-store"
+import { useAcademicStore } from "@/lib/academic-store"
+import { ApiBoundary, BannerModeTransisi } from "@/components/ui/api-boundary"
+import type { KelasDto, StatusKrsDto } from "@/server/modules/akademik"
 import { validateStudentKrsEnrollment } from "@/lib/academic-utils"
 import { PageHeader } from "@/components/ui/page-header"
 import { Button } from "@/components/ui/button"
@@ -26,17 +28,20 @@ import { Modal } from "@/components/ui/modal"
 import { formatDate } from "@/lib/utils"
 
 export default function MahasiswaKrsPage() {
-  const {
-    state,
-    activePeriode,
-    enrichedKelas,
-    enrollKrs,
-    dropKrs,
-  } = useAcademicStore()
+  return (
+    <ApiBoundary<StatusKrsDto> url="/api/v1/mahasiswa/krs">
+      {(data) => <KrsContent data={data} />}
+    </ApiBoundary>
+  )
+}
 
-  // Mahasiswa login: mhs-1 (Budi Santoso, NIM 220101001)
-  const currentMahasiswaId = "mhs-1"
-  const currentStudent = state.mahasiswa.find((m) => m.id === currentMahasiswaId)
+function KrsContent({ data }: { data: StatusKrsDto }) {
+  // TODO(tulis): ambil/batalkan KRS masih lewat store lokal; pindahkan ke POST/DELETE /api/v1/mahasiswa/krs.
+  const { enrollKrs, dropKrs } = useAcademicStore()
+
+  const activePeriode = data.periode
+  const enrichedKelas = data.kelasTersedia
+  const currentMahasiswaId = data.mahasiswa.id
 
   const [searchQuery, setSearchQuery] = useState("")
   const [activeSubTab, setActiveSubTab] = useState<"TERPILIH" | "PENATAAN">("TERPILIH")
@@ -45,20 +50,15 @@ export default function MahasiswaKrsPage() {
 
   const isKrsOpen = activePeriode?.isKrsOpen ?? true
 
-  // Current enrolled KRS items for this student in the active period
+  // KRS disetujui milik mahasiswa pada periode aktif (dari database)
   const myKrsItems = useMemo(() => {
-    return state.krs
-      .filter(
-        (k) =>
-          k.mahasiswaId === currentMahasiswaId &&
-          k.status === "DISETUJUI" &&
-          k.periodeId === activePeriode?.id
-      )
+    return data.krs
+      .filter((k) => k.status === "DISETUJUI")
       .map((k) => ({
         ...k,
         kelasDetail: enrichedKelas.find((ek) => ek.id === k.kelasId),
       }))
-  }, [state.krs, currentMahasiswaId, activePeriode, enrichedKelas])
+  }, [data.krs, enrichedKelas])
 
   // Total SKS currently taken
   const currentTotalSks = useMemo(() => {
@@ -68,7 +68,7 @@ export default function MahasiswaKrsPage() {
     )
   }, [myKrsItems])
 
-  const maxSks = 24
+  const maxSks = data.maxSks
   const remainingSks = Math.max(maxSks - currentTotalSks, 0)
 
   // Enrolled classes formatted for conflict checking
@@ -92,7 +92,7 @@ export default function MahasiswaKrsPage() {
   }, [myKrsItems])
 
   // Handle taking a class (FR-1.4)
-  const handleEnroll = (kelas: KelasItem) => {
+  const handleEnroll = (kelas: KelasDto) => {
     if (!isKrsOpen) {
       setConflictModalMsg("Jendela KRS saat ini sedang ditutup. Anda tidak dapat menambah atau mengubah kelas.")
       return
@@ -150,6 +150,7 @@ export default function MahasiswaKrsPage() {
 
   return (
     <div className="space-y-6">
+      <BannerModeTransisi />
       <PageHeader
         title="Kartu Rencana Studi (KRS)"
         subtitle={`Penyusunan rencana studi semester berjalan ${activePeriode?.nama || ""}.`}

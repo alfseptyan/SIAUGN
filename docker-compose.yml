@@ -1,0 +1,21 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: siakad-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: siakad
+      POSTGRES_PASSWORD: siakad
+      POSTGRES_DB: siakad
+    ports:
+      - "5432:5432"
+    volumes:
+      - siakad_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U siakad -d siakad"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  siakad_pgdata:

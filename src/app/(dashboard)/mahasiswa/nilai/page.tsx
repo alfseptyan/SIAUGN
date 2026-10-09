@@ -13,106 +13,43 @@ import {
   GraduationCap,
   Download,
 } from "lucide-react"
-import {
-  useAcademicStore,
-  PAST_GRADES_MHS1,
-  PastGradeItem,
-} from "@/lib/academic-store"
-import {
-  letterGradeToIndeks,
-  calculateGpaFromGrades,
-  getPredikatKelulusan,
-} from "@/lib/academic-utils"
+import { useApi } from "@/lib/api-client"
+import { ApiError, ApiLoading } from "@/components/ui/api-boundary"
+import type { KhsDto } from "@/server/modules/akademik"
 import { PageHeader } from "@/components/ui/page-header"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs } from "@/components/ui/tabs"
 
 export default function MahasiswaNilaiPage() {
-  const { state, activePeriode, enrichedKelas } = useAcademicStore()
+  // undefined = semester berjalan (ditentukan server)
+  const [semester, setSemester] = useState<number | undefined>(undefined)
+  const { data, error } = useApi<KhsDto>(
+    `/api/v1/mahasiswa/khs${semester ? `?semester=${semester}` : ""}`
+  )
 
-  // Mahasiswa login: mhs-1 (Budi Santoso)
-  const currentMahasiswaId = "mhs-1"
-  const currentStudent = state.mahasiswa.find((m) => m.id === currentMahasiswaId)
+  if (error && !data) return <ApiError message={error} />
+  if (!data) return <ApiLoading />
+  return <NilaiContent data={data} onSelectSemester={setSemester} />
+}
+
+function NilaiContent({
+  data,
+  onSelectSemester,
+}: {
+  data: KhsDto
+  onSelectSemester: (semester: number) => void
+}) {
+  // Semua angka (IPS, IPK, predikat) dihitung di server memakai calculateGpaFromGrades
+  const currentStudent = data.mahasiswa
+  const pastCourses = data.riwayat
+  const khsCourses = data.khs.mataKuliah
+  const ipsResult = data.khs.ips
+  const cumulativeResult = data.ipk
+  const predikat = data.predikat
+  const selectedSemester = data.khs.semester
 
   const [activeTab, setActiveTab] = useState<string>("khs")
-  const [selectedSemester, setSelectedSemester] = useState<number>(5) // default current semester 5
-
-  // 1. Current Semester (Semester 5) courses from active KRS & grades
-  const currentSemesterCourses = useMemo(() => {
-    const studentKrs = state.krs.filter(
-      (k) =>
-        k.mahasiswaId === currentMahasiswaId &&
-        k.status === "DISETUJUI" &&
-        k.periodeId === activePeriode?.id
-    )
-
-    return studentKrs.map((krs) => {
-      const k = enrichedKelas.find((ek) => ek.id === krs.kelasId)
-      const grade = state.nilai.find(
-        (n) => n.kelasId === krs.kelasId && n.mahasiswaId === currentMahasiswaId
-      )
-      const isLocked = Boolean(grade?.lockedAt)
-
-      return {
-        id: krs.id,
-        kodeMk: k?.mataKuliah?.kode || "",
-        namaMk: k?.mataKuliah?.nama || "",
-        sks: k?.mataKuliah?.sks || 0,
-        namaKelas: k?.namaKelas || "A",
-        dosen: k?.dosen?.nama || "",
-        nilaiAkhir: isLocked
-          ? grade?.nilaiAkhirFinal ?? grade?.nilaiAkhirOtomatis
-          : null,
-        nilaiHuruf: isLocked ? grade?.huruf : null,
-        bobotIndeks: isLocked && grade?.huruf ? letterGradeToIndeks(grade.huruf) : 0,
-        isLocked,
-      }
-    })
-  }, [state.krs, state.nilai, currentMahasiswaId, activePeriode, enrichedKelas])
-
-  // 2. All past graded courses
-  const pastCourses = PAST_GRADES_MHS1
-
-  // 3. Courses for the currently selected semester in KHS tab
-  const khsCourses = useMemo(() => {
-    if (selectedSemester === 5) {
-      return currentSemesterCourses
-    }
-    return pastCourses
-      .filter((c) => c.semesterAmbil === selectedSemester)
-      .map((c) => ({
-        id: c.id,
-        kodeMk: c.kodeMk,
-        namaMk: c.namaMk,
-        sks: c.sks,
-        namaKelas: "A",
-        dosen: "-",
-        nilaiAkhir: 85,
-        nilaiHuruf: c.nilaiHuruf,
-        bobotIndeks: c.bobotIndeks,
-        isLocked: true,
-      }))
-  }, [selectedSemester, currentSemesterCourses, pastCourses])
-
-  // 4. Calculate IPS for selected semester
-  const ipsResult = useMemo(() => {
-    const gradedOnly = khsCourses.filter((c) => c.isLocked && c.nilaiHuruf)
-    return calculateGpaFromGrades(gradedOnly)
-  }, [khsCourses])
-
-  // 5. Calculate Cumulative IPK (All completed courses from Semester 1 s/d 5)
-  const cumulativeResult = useMemo(() => {
-    const allGraded: Array<{ sks: number; huruf?: string | null }> = [
-      ...pastCourses.map((c) => ({ sks: c.sks, huruf: c.nilaiHuruf })),
-      ...currentSemesterCourses
-        .filter((c) => c.isLocked && c.nilaiHuruf)
-        .map((c) => ({ sks: c.sks, huruf: c.nilaiHuruf })),
-    ]
-    return calculateGpaFromGrades(allGraded)
-  }, [pastCourses, currentSemesterCourses])
-
-  const predikat = getPredikatKelulusan(cumulativeResult.gpa)
 
   // Tabs
   const tabsConfig = [
@@ -211,14 +148,17 @@ export default function MahasiswaNilaiPage() {
               </span>
               <select
                 value={selectedSemester}
-                onChange={(e) => setSelectedSemester(Number(e.target.value))}
+                onChange={(e) => onSelectSemester(Number(e.target.value))}
                 className="text-sm font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
               >
-                <option value={5}>Semester 5 (Ganjil 2025/2026 - Berjalan)</option>
-                <option value={4}>Semester 4 (Genap 2023/2024)</option>
-                <option value={3}>Semester 3 (Ganjil 2023/2024)</option>
-                <option value={2}>Semester 2 (Genap 2022/2023)</option>
-                <option value={1}>Semester 1 (Ganjil 2022/2023)</option>
+                {[...data.khs.semesterTersedia].reverse().map((n) => (
+                  <option key={n} value={n}>
+                    Semester {n}
+                    {n === currentStudent.semesterSekarang
+                      ? " (Berjalan)"
+                      : ` (${pastCourses.find((c) => c.semesterAmbil === n)?.periodeNama ?? "-"})`}
+                  </option>
+                ))}
               </select>
             </div>
 

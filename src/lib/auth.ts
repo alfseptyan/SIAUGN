@@ -1,6 +1,7 @@
 import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
-import { MOCK_USERS } from "@/lib/mock-data"
+import bcrypt from "bcryptjs"
+import { db } from "@/server/shared/db"
 import type { UserRole } from "@/lib/constants"
 
 // Extend NextAuth types
@@ -44,12 +45,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const email = credentials.email as string
         const password = credentials.password as string
 
-        // --- MOCK AUTH: ganti dengan Prisma query nanti ---
-        const user = MOCK_USERS.find(
-          (u) => u.email === email && u.password === password
-        )
+        const user = await db.user.findUnique({ where: { email } })
+        if (!user || !user.isActive) {
+          return null
+        }
 
-        if (!user) {
+        const passwordCocok = await bcrypt.compare(password, user.password)
+        if (!passwordCocok) {
           return null
         }
 
@@ -59,9 +61,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           name: user.nama,
           nama: user.nama,
           role: user.role,
-          image: user.avatarUrl || null,
+          image: user.avatarUrl,
         }
-        // --- END MOCK AUTH ---
       },
     }),
   ],

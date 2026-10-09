@@ -15,24 +15,28 @@ import {
   ShieldCheck,
   ShieldAlert,
 } from "lucide-react"
-import { useAcademicStore } from "@/lib/academic-store"
+import { ApiBoundary, BannerModeTransisi } from "@/components/ui/api-boundary"
+import type { RingkasanPresensiDto } from "@/server/modules/presensi"
 import { usePresensiStore } from "@/lib/presensi-store"
-import { calculateAttendanceMetrics } from "@/lib/presensi-utils"
 import { PageHeader } from "@/components/ui/page-header"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs } from "@/components/ui/tabs"
 
 export default function MahasiswaPresensiPage() {
-  const { state: academicState, enrichedKelas, activePeriode } = useAcademicStore()
-  const { state: presensiState, recordMahasiswaPresensi } = usePresensiStore()
-
-  // Mahasiswa login: mhs-1 (Budi Santoso)
-  const currentMahasiswaId = "mhs-1"
-  const currentStudent = academicState.mahasiswa.find(
-    (m) => m.id === currentMahasiswaId
+  return (
+    <ApiBoundary<RingkasanPresensiDto> url="/api/v1/mahasiswa/presensi">
+      {(data) => <PresensiContent data={data} />}
+    </ApiBoundary>
   )
+}
 
+function PresensiContent({ data }: { data: RingkasanPresensiDto }) {
+  // TODO(tulis): scan/input token masih memakai store lokal; pindahkan ke POST /api/v1/mahasiswa/presensi.
+  const { recordMahasiswaPresensi } = usePresensiStore()
+
+  // Kelas yang diambil, sesi aktif, dan riwayat kehadiran berasal dari database
+  const currentMahasiswaId = data.mahasiswaId
   const [activeTab, setActiveTab] = useState<string>("scan")
   const [inputToken, setInputToken] = useState<string>("")
   const [selectedSesiId, setSelectedSesiId] = useState<string>("")
@@ -42,26 +46,11 @@ export default function MahasiswaPresensiPage() {
     message: string
   } | null>(null)
 
-  // Enrolled classes for this student
-  const myEnrolledClasses = useMemo(() => {
-    const studentKrs = academicState.krs.filter(
-      (k) =>
-        k.mahasiswaId === currentMahasiswaId &&
-        k.status === "DISETUJUI" &&
-        k.periodeId === activePeriode?.id
-    )
-    return studentKrs
-      .map((k) => enrichedKelas.find((ek) => ek.id === k.kelasId))
-      .filter(Boolean) as any[]
-  }, [academicState.krs, currentMahasiswaId, activePeriode, enrichedKelas])
+  // Kelas yang diambil mahasiswa
+  const myEnrolledClasses = useMemo(() => data.kelas.map((k) => k.kelas), [data.kelas])
 
-  // Active sessions in classes that this student enrolled in
-  const availableActiveSessions = useMemo(() => {
-    const classIds = myEnrolledClasses.map((c) => c.id)
-    return presensiState.sesi.filter(
-      (s) => s.isActive && classIds.includes(s.kelasId)
-    )
-  }, [myEnrolledClasses, presensiState.sesi])
+  // Sesi yang sedang dibuka pada kelas yang diambil
+  const availableActiveSessions = data.sesiAktif
 
   // Auto-select first active session
   React.useEffect(() => {
@@ -104,38 +93,8 @@ export default function MahasiswaPresensiPage() {
     }
   }
 
-  // Attendance history for all enrolled classes
-  const classesAttendanceData = useMemo(() => {
-    return myEnrolledClasses.map((kelas) => {
-      const classSessions = presensiState.sesi
-        .filter((s) => s.kelasId === kelas.id)
-        .sort((a, b) => a.pertemuanKe - b.pertemuanKe)
-
-      const studentPresensiList = classSessions.map((s) => {
-        const p = presensiState.presensi.find(
-          (item) => item.sesiId === s.id && item.mahasiswaId === currentMahasiswaId
-        )
-        return {
-          sesi: s,
-          status: p?.status || ("ALFA" as const),
-          metode: p?.metode,
-          waktuScan: p?.waktuScan,
-        }
-      })
-
-      const metrics = calculateAttendanceMetrics(
-        studentPresensiList.map((item) => ({ status: item.status })),
-        classSessions.length,
-        kelas.ambangKehadiranPersen || 75
-      )
-
-      return {
-        kelas,
-        sessions: studentPresensiList,
-        metrics,
-      }
-    })
-  }, [myEnrolledClasses, presensiState.sesi, presensiState.presensi, currentMahasiswaId])
+  // Riwayat kehadiran dan metrik per kelas (dihitung di server)
+  const classesAttendanceData = data.kelas
 
   const tabsConfig = [
     { id: "scan", label: "Scan / Input Presensi (FR-2.2)" },
@@ -144,6 +103,7 @@ export default function MahasiswaPresensiPage() {
 
   return (
     <div className="space-y-6">
+      <BannerModeTransisi />
       <PageHeader
         title="Presensi Perkuliahan"
         subtitle="Pindai QR Code atau masukkan token presensi perkuliahan, serta pantau ambang batas kehadiran minimum (FR-2.2 & FR-2.6)."

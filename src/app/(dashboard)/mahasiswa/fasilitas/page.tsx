@@ -28,20 +28,32 @@ import {
   getStatusPeminjamanVariant,
   type FasilitasItem,
 } from "@/lib/layanan-store"
+import { ApiBoundary, BannerModeTransisi } from "@/components/ui/api-boundary"
+import type { StatusPengajuanDto } from "@/server/modules/layanan"
 
 type TabView = "kalender" | "form" | "riwayat"
 
 export default function MahasiswaFasilitasPage() {
-  const { state, submitPeminjaman } = useLayananStore()
+  return (
+    <ApiBoundary<StatusPengajuanDto> url="/api/v1/mahasiswa/pengajuan">
+      {(data) => <FasilitasContent data={data} />}
+    </ApiBoundary>
+  )
+}
+
+function FasilitasContent({ data }: { data: StatusPengajuanDto }) {
+  // TODO(tulis): pengajuan peminjaman masih memakai store lokal; pindahkan ke POST /api/v1/mahasiswa/pengajuan.
+  const { submitPeminjaman } = useLayananStore()
+  const me = data.mahasiswa
 
   const [activeTab, setActiveTab] = useState<TabView>("kalender")
 
   // Kalender tab state
-  const [selectedFasKalId, setSelectedFasKalId] = useState<string>(state.fasilitas[0]?.id ?? "")
+  const [selectedFasKalId, setSelectedFasKalId] = useState<string>(data.fasilitas[0]?.id ?? "")
   const [weekOffset, setWeekOffset] = useState(0)
 
   // Form state
-  const [formFasId, setFormFasId] = useState<string>(state.fasilitas[0]?.id ?? "")
+  const [formFasId, setFormFasId] = useState<string>(data.fasilitas[0]?.id ?? "")
   const [formTanggal, setFormTanggal] = useState("")
   const [formJamMulai, setFormJamMulai] = useState("08:00")
   const [formJamSelesai, setFormJamSelesai] = useState("10:00")
@@ -55,10 +67,10 @@ export default function MahasiswaFasilitasPage() {
   const timeSlots = generateTimeSlots()
 
   // Filter only active fasilitas
-  const activeFasilitas = state.fasilitas.filter((f) => f.isActive)
+  const activeFasilitas = data.fasilitas.filter((f) => f.isActive)
 
-  // Riwayat peminjaman mahasiswa (mhs-1 = Budi Santoso)
-  const myPeminjaman = state.peminjaman.filter((p) => p.mahasiswaId === "mhs-1")
+  // Riwayat peminjaman milik mahasiswa (dari database)
+  const myPeminjaman = data.peminjaman
 
   // Week logic
   const weekDates = useMemo(() => {
@@ -93,7 +105,7 @@ export default function MahasiswaFasilitasPage() {
       return
     }
 
-    const result = checkBentrokPeminjaman(state.peminjaman, formFasId, formTanggal, formJamMulai, formJamSelesai)
+    const result = checkBentrokPeminjaman(data.jadwalFasilitas, formFasId, formTanggal, formJamMulai, formJamSelesai)
     if (result.isBentrok) {
       setConflictError(`Jadwal bentrok dengan peminjaman "${result.conflictWith?.keperluan}" oleh ${result.conflictWith?.namaMahasiswa} (${result.conflictWith?.jamMulai} - ${result.conflictWith?.jamSelesai}).`)
     } else {
@@ -108,9 +120,9 @@ export default function MahasiswaFasilitasPage() {
 
     try {
       submitPeminjaman({
-        mahasiswaId: "mhs-1",
-        namaMahasiswa: "Budi Santoso",
-        nim: "220101001",
+        mahasiswaId: me.id,
+        namaMahasiswa: me.nama,
+        nim: me.nim,
         fasilitasId: formFasId,
         tanggal: formTanggal,
         jamMulai: formJamMulai,
@@ -138,6 +150,7 @@ export default function MahasiswaFasilitasPage() {
 
   return (
     <div className="space-y-6">
+      <BannerModeTransisi />
       <PageHeader
         title="Peminjaman Fasilitas Kampus"
         subtitle="Cek ketersediaan, ajukan peminjaman ruangan & peralatan, dan pantau status permintaanmu (FR-4.1 & FR-4.2)."
@@ -193,7 +206,7 @@ export default function MahasiswaFasilitasPage() {
                       <tr key={slot} className={`border-b border-border/20 ${slotIdx % 2 === 0 ? "bg-white" : "bg-muted/10"}`}>
                         <td className="px-3 py-2 text-xs font-mono text-muted-foreground bg-muted/20 border-r border-border/30">{slot}</td>
                         {weekDates.map((day) => {
-                          const dayBookings = getBookingsForDate(state.peminjaman, selectedFasKalId, day.dateStr)
+                          const dayBookings = getBookingsForDate(data.jadwalFasilitas, selectedFasKalId, day.dateStr)
                           const occupant = isSlotOccupied(dayBookings, hour)
                           if (occupant) {
                             const [startH] = occupant.jamMulai.split(":").map(Number)

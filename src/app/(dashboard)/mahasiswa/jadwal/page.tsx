@@ -11,7 +11,8 @@ import {
   List,
   BookOpen,
 } from "lucide-react"
-import { useAcademicStore } from "@/lib/academic-store"
+import { ApiBoundary } from "@/components/ui/api-boundary"
+import type { JadwalDto, KelasDto } from "@/server/modules/akademik"
 import { PageHeader } from "@/components/ui/page-header"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -19,28 +20,23 @@ import { Badge } from "@/components/ui/badge"
 const DAYS = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU"]
 
 export default function MahasiswaJadwalPage() {
-  const { state, activePeriode, enrichedKelas } = useAcademicStore()
+  return (
+    <ApiBoundary<JadwalDto> url="/api/v1/mahasiswa/jadwal">
+      {(data) => <JadwalContent data={data} />}
+    </ApiBoundary>
+  )
+}
 
-  // Mahasiswa: mhs-1
-  const currentMahasiswaId = "mhs-1"
+function JadwalContent({ data }: { data: JadwalDto }) {
+  const activePeriode = data.periode
   const [viewMode, setViewMode] = useState<"TIMETABLE" | "LIST">("TIMETABLE")
 
-  // My enrolled classes
-  const myClasses = useMemo(() => {
-    return state.krs
-      .filter(
-        (k) =>
-          k.mahasiswaId === currentMahasiswaId &&
-          k.status === "DISETUJUI" &&
-          k.periodeId === activePeriode?.id
-      )
-      .map((k) => enrichedKelas.find((ek) => ek.id === k.kelasId))
-      .filter(Boolean) as any[]
-  }, [state.krs, currentMahasiswaId, activePeriode, enrichedKelas])
+  // Kelas yang diambil (KRS disetujui) pada periode aktif, dari database
+  const myClasses: KelasDto[] = data.kelas
 
   // Group classes by day
   const classesByDay = useMemo(() => {
-    const map: Record<string, any[]> = {}
+    const map: Record<string, KelasDto[]> = {}
     for (const day of DAYS) {
       map[day] = myClasses.filter((c) => c.hari.toUpperCase() === day)
     }

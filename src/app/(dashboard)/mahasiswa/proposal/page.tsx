@@ -24,11 +24,23 @@ import {
   formatRupiahLayanan,
   getStatusProposalVariant,
 } from "@/lib/layanan-store"
+import { ApiBoundary, BannerModeTransisi } from "@/components/ui/api-boundary"
+import type { StatusPengajuanDto } from "@/server/modules/layanan"
 
 type TabView = "form" | "riwayat"
 
 export default function MahasiswaProposalPage() {
-  const { state, submitProposal } = useLayananStore()
+  return (
+    <ApiBoundary<StatusPengajuanDto> url="/api/v1/mahasiswa/pengajuan">
+      {(data) => <ProposalContent data={data} />}
+    </ApiBoundary>
+  )
+}
+
+function ProposalContent({ data }: { data: StatusPengajuanDto }) {
+  // TODO(tulis): pengajuan proposal masih memakai store lokal; pindahkan ke POST /api/v1/mahasiswa/pengajuan.
+  const { submitProposal } = useLayananStore()
+  const me = data.mahasiswa
 
   const [activeTab, setActiveTab] = useState<TabView>("form")
 
@@ -47,8 +59,8 @@ export default function MahasiswaProposalPage() {
   // Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
-  // Riwayat proposal mahasiswa (mhs-1 = Budi Santoso)
-  const myProposal = state.proposal.filter((p) => p.mahasiswaId === "mhs-1")
+  // Riwayat proposal milik mahasiswa (dari database)
+  const myProposal = data.proposal
 
   const handleFileSimulate = () => {
     // Simulate PDF file picking
@@ -72,9 +84,9 @@ export default function MahasiswaProposalPage() {
     if (!formPdfNama) { alert("File proposal PDF wajib dilampirkan."); return }
 
     submitProposal({
-      mahasiswaId: "mhs-1",
-      namaMahasiswa: "Budi Santoso",
-      nim: "220101001",
+      mahasiswaId: me.id,
+      namaMahasiswa: me.nama,
+      nim: me.nim,
       organisasi: formOrganisasi || "Pribadi",
       namaAcara: formNamaAcara,
       deskripsi: formDeskripsi,
@@ -106,6 +118,7 @@ export default function MahasiswaProposalPage() {
 
   return (
     <div className="space-y-6">
+      <BannerModeTransisi />
       <PageHeader
         title="Proposal Kegiatan Kemahasiswaan"
         subtitle="Ajukan proposal kegiatan organisasi mahasiswa dan pantau proses persetujuan dari Direktorat Kemahasiswaan (FR-4.4)."
